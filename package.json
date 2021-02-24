@@ -1,0 +1,15 @@
+{
+  "name": "raveOS_bot",
+  "version": "0.0.1",
+  "description": "Small telegram bot for RaveOS",
+  "main": "index.js",
+  "repository": "git@github.com:dim2e3/raveOS_bot.git",
+  "author": "Dmitriy Trunov <dim2e3@gmail.com>",
+  "license": "GNU",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "dotenv": "^8.2.0",
+    "mongoose": "^5.11.18",
+    "node-telegram-bot-api": "^0.51.0"
+  }
+}
