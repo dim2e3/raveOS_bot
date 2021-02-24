@@ -1,4 +1,11 @@
 require("dotenv").config();
+const express = require("express");
+const app = express();
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`Our app is running on port ${PORT}`);
+});
 
 const options = {
   adminId: process.env.ADMINID,
