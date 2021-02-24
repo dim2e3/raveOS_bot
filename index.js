@@ -39,12 +39,10 @@ async function sendRequestRigs() {
       )
       .exec()
       .then((rigs) => {
-        // console.log('Element ', element, rigs)
-        rigs.forEach((rigs) => {
+      rigs.forEach((rigs) => {
           const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
             (rigResponse) => {
-              // console.log('rig response', rigResponse)
-              if (rigResponse !== rigs.rigStatus) {
+            if (rigResponse !== rigs.rigStatus) {
                 switch (rigResponse) {
                   case 0: {
                     console.log("To telegram", element);
@@ -73,7 +71,6 @@ async function sendRequestRigs() {
                 }
               }
               const currentCheckTime = new Date();
-              // console.log('Now is', currentCheckTime)
               const newStatus = rigState
                 .updateOne(
                   { rigNumber: rigs.rigNumber },
@@ -85,20 +82,19 @@ async function sendRequestRigs() {
                   }
                 )
                 .exec();
-              // .then((newStatus) => console.log('from sendRequestS', rigs.rigNumber, rigs.rigStatus))
+
             }
           );
         });
       });
   });
-  // console.log(id)
-}
+  }
 async function getStatus(
   req,
   request_Token = "9efffce7-d616-4aa9-9fe5-fce8723a0214"
 ) {
   try {
-    // console.log('Send rig', req, 'rig token', request_Token)
+
     const response = await axios.get(`${request_Url}${req}`, {
       headers: {
         "X-Auth-Token": request_Token,
@@ -106,8 +102,6 @@ async function getStatus(
     });
     const { data } = response;
 
-    // console.log({ data });
-    // const rigId = data.id
     const rigStatus = data.online_status;
     const rigMpu = data.mpu_list.length;
     console.log(
@@ -199,7 +193,7 @@ const telegramId = mongoose.model("telegramId", telegramIdSchema);
 const bot = new TelegramBot(token, { polling: true });
 
 bot.on("message", async function (msg) {
-  const fromId = msg.from.id; // Получаем ID отправителя
+  const fromId = msg.from.id;
   let rigNumbers = await telegramId.find(
     { id: fromId },
     {
@@ -222,7 +216,6 @@ bot.on("message", async function (msg) {
       });
     }
   });
-  // console.log(msg)
   if (msg.reply_to_message) {
     const isBot = msg.reply_to_message.from.id;
     const regexp = /[^\D]/g;
@@ -241,9 +234,8 @@ bot.on("message", async function (msg) {
   }
 });
 bot.onText(/\/watch (.+)/, async function (msg, match) {
-  // console.log(msg)
-  const fromId = msg.from.id; // Получаем ID отправителя
-  const rig = match[1]; // Получаем текст после /echo
+  const fromId = msg.from.id;
+  const rig = match[1];
 
   const { id, is_bot, first_name, last_name, username } = msg.from;
 
@@ -270,8 +262,8 @@ bot.onText(/\/watch (.+)/, async function (msg, match) {
 });
 
 bot.onText(/\/watchstop (.+)/, async function (msg, match) {
-  const fromId = msg.from.id; // Получаем ID отправителя
-  const rig = match[1]; // Получаем текст после /echo
+  const fromId = msg.from.id;
+  const rig = match[1];
   bot.sendMessage(fromId, `Stop watching ${rig} rig`);
 
    const newtelegramId = telegramId
@@ -285,7 +277,7 @@ bot.onText(/\/watchstop (.+)/, async function (msg, match) {
 });
 
 bot.onText(/\/watchrig/, async function (msg, match) {
-  const fromId = msg.from.id; // Получаем ID отправителя
+  const fromId = msg.from.id;
 
   let rigNumbers = await telegramId.find(
     { id: fromId },
@@ -305,7 +297,7 @@ bot.onText(/\/watchrig/, async function (msg, match) {
   bot.sendMessage(fromId, `You watching ${resp} rig`);
 });
 bot.onText(/\/status/, async function (msg, match) {
-  const fromId = msg.from.id; // Получаем ID отправителя
+  const fromId = msg.from.id;
   let rigNumbers = await telegramId.find(
     { id: fromId },
     {
@@ -331,12 +323,10 @@ bot.onText(/\/status/, async function (msg, match) {
       )
       .exec()
       .then((rigs) => {
-        // console.log('Rigs ', element, rigs)
         rigs.forEach((rigs) => {
           const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
             (rigResponse) => {
-              // console.log('rig response', rigResponse)
-              switch (rigResponse) {
+                       switch (rigResponse) {
                 case 0: {
                   console.log("To telegram", fromId);
                   bot.sendMessage(fromId, `Rig ${rigs.rigNumber} is offline`);
@@ -355,11 +345,9 @@ bot.onText(/\/status/, async function (msg, match) {
                   );
                   break;
                 }
-
                 default:
                   console.log("State unknown");
               }
-
               const currentCheckTime = new Date();
               const newStatus = rigState
                 .updateOne(
@@ -372,15 +360,14 @@ bot.onText(/\/status/, async function (msg, match) {
                   }
                 )
                 .exec();
-              // .then((newStatus) => console.log('from sendRequestS', rigs.rigNumber, rigs.rigStatus))
-            }
+                          }
           );
         });
       });
   });
 });
 bot.onText(/\/register/, async function (msg, match) {
-  const fromId = msg.from.id; // Получаем ID отправителя
+  const fromId = msg.from.id;
   const { id, is_bot, first_name, last_name, username } = msg.from;
 
   let user = await telegramId.findOne({ id: fromId });
@@ -405,7 +392,7 @@ bot.onText(/\/register/, async function (msg, match) {
 });
 
 bot.onText(/\/serverwatch/, async function (msg, match) {
-  const fromId = msg.from.id; // Получаем ID отправителя
+  const fromId = msg.from.id;
   console.log('from server watch', adminId)
   if (fromId === Number(adminId)) {
     const rigNumbers = await rigState.distinct("rigNumber").exec();
@@ -415,7 +402,7 @@ bot.onText(/\/serverwatch/, async function (msg, match) {
 });
 
 bot.onText(/\/token/, async function (msg, match) {
-  const fromId = msg.from.id; // Получаем ID отправителя
+  const fromId = msg.from.id;
   let rigNumbers = await telegramId.find(
     { id: fromId },
     {
@@ -439,15 +426,7 @@ bot.onText(/\/token/, async function (msg, match) {
 });
 
 
-// остановить вывод через 1000 миллисекунд * 60 секунд * 1 минут
+// Set interval request 1000 msec * 60 sec * 1 min
 const timeInterval = 1000 * 60 * 1;
-// // let timerId = setInterval(() => sendRequest(fromId, resp), timeInterval);
 let timerId = setInterval(() => sendRequestRigs(), timeInterval);
 
-// sendRequestRigs()
-
-// // остановить вывод через 1000 миллисекунд * 60 секунд * 30 минут
-// const timeStop = 1000 * 60 * 10
-// setTimeout(() => {
-//   clearInterval(timerId)
-// }, timeStop)
