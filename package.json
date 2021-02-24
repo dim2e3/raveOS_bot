@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "description": "Small telegram bot for RaveOS",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "repository": "git@github.com:dim2e3/raveOS_bot.git",
   "author": "Dmitriy Trunov <dim2e3@gmail.com>",
   "license": "GNU",
