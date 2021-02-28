@@ -142,7 +142,7 @@ const rigStateSchema = new mongoose.Schema(
     },
     rigToken: {
       type: String,
-      required: true,
+      required: false,
     },
     rigStatus: {
       type: Number,
@@ -432,8 +432,25 @@ bot.onText(/\/token/, async function (msg, match) {
   });
 });
 
+bot.onText(/\/serverstop/, async function (msg, match) {
+  const fromId = msg.from.id; // Получаем ID отправителя
+  if (fromId === adminId) {
+    console.log("Server stop watching");
+    stopwatching();
+    bot.sendMessage(fromId, `Server stop watching`);
+  }
+});
+
+
+function stopwatching() {
+  // остановить вывод через 1000 миллисекунд * 60 секунд * 1 минут
+  const timeStop = 1000 * 60 * 1;
+  setTimeout(() => {
+    clearInterval(timerId);
+  }, timeStop);
+}
 
 // Set interval request 1000 msec * 60 sec * 1 min
-const timeInterval = 1000 * 60 * 1;
+const timeInterval = 1000 * 60 * 5;
 let timerId = setInterval(() => sendRequestRigs(), timeInterval);
 
