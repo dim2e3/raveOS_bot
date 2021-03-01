@@ -46,29 +46,41 @@ async function sendRequestRigs() {
       )
       .exec()
       .then((rigs) => {
-      rigs.forEach((rigs) => {
+        rigs.forEach((rigs) => {
           const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
             (rigResponse) => {
-            if (rigResponse !== rigs.rigStatus) {
+              if (rigResponse !== rigs.rigStatus) {
                 switch (rigResponse) {
                   case 0: {
-                    console.log("To telegram", element);
+                    console.log("To telegram", fromId);
                     bot.sendMessage(
-                      element,
-                      `Rig ${rigs.rigNumber} is offline`
+                      fromId,
+                      `Rig <b>${rigs.rigNumber}</b> is <b>offline</b>🔴`,
+                      {
+                        parse_mode: "HTML",
+                      }
                     );
                     break;
                   }
                   case 1: {
-                    console.log("To telegram", element);
-                    bot.sendMessage(element, `Rig ${rigs.rigNumber} is online`);
+                    console.log("To telegram", fromId);
+                    bot.sendMessage(
+                      fromId,
+                      `Rig <b>${rigs.rigNumber}</b> is <b>online</b>🟢`,
+                      {
+                        parse_mode: "HTML",
+                      }
+                    );
                     break;
                   }
                   case 2: {
-                    console.log("To telegram", element);
+                    console.log("To telegram", fromId);
                     bot.sendMessage(
-                      element,
-                      `Rig ${rigs.rigNumber} is online with errors`
+                      fromId,
+                      `Rig <b>${rigs.rigNumber}</b> is online with errors❓`,
+                      {
+                        parse_mode: "HTML",
+                      }
                     );
                     break;
                   }
@@ -89,19 +101,17 @@ async function sendRequestRigs() {
                   }
                 )
                 .exec();
-
             }
           );
         });
       });
   });
-  }
+}
 async function getStatus(
   req,
   request_Token = "9efffce7-d616-4aa9-9fe5-fce8723a0214"
 ) {
   try {
-
     const response = await axios.get(`${request_Url}${req}`, {
       headers: {
         "X-Auth-Token": request_Token,
@@ -128,7 +138,6 @@ async function getStatus(
   return rigStatus && rigMpu && 1;
 }
 
-
 const rigStateSchema = new mongoose.Schema(
   {
     id: {
@@ -147,6 +156,7 @@ const rigStateSchema = new mongoose.Schema(
     rigStatus: {
       type: Number,
       required: true,
+      default: 0,
     },
     rigCheckTime: { type: Date, default: Date.now },
   },
@@ -273,7 +283,7 @@ bot.onText(/\/watchstop (.+)/, async function (msg, match) {
   const rig = match[1];
   bot.sendMessage(fromId, `Stop watching ${rig} rig`);
 
-   const newtelegramId = telegramId
+  const newtelegramId = telegramId
     .updateOne({ id: fromId }, { $pull: { rigNumbers: rig } })
     .exec()
     .then((newStatus) => console.log("Remove rig", fromId, rig))
@@ -333,25 +343,41 @@ bot.onText(/\/status/, async function (msg, match) {
         rigs.forEach((rigs) => {
           const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
             (rigResponse) => {
-                       switch (rigResponse) {
+              switch (rigResponse) {
                 case 0: {
                   console.log("To telegram", fromId);
-                  bot.sendMessage(fromId, `Rig ${rigs.rigNumber} is offline`);
+                  bot.sendMessage(
+                    fromId,
+                    `Rig <b>${rigs.rigNumber}</b> is <b>offline</b>🔴`,
+                    {
+                      parse_mode: "HTML",
+                    }
+                  );
                   break;
                 }
                 case 1: {
                   console.log("To telegram", fromId);
-                  bot.sendMessage(fromId, `Rig ${rigs.rigNumber} is online`);
+                  bot.sendMessage(
+                    fromId,
+                    `Rig <b>${rigs.rigNumber}</b> is <b>online</b>🟢`,
+                    {
+                      parse_mode: "HTML",
+                    }
+                  );
                   break;
                 }
                 case 2: {
                   console.log("To telegram", fromId);
                   bot.sendMessage(
                     fromId,
-                    `Rig ${rigs.rigNumber} is online with errors`
+                    `Rig <b>${rigs.rigNumber}</b> is online with errors❓`,
+                    {
+                      parse_mode: "HTML",
+                    }
                   );
                   break;
                 }
+
                 default:
                   console.log("State unknown");
               }
@@ -367,7 +393,7 @@ bot.onText(/\/status/, async function (msg, match) {
                   }
                 )
                 .exec();
-                          }
+            }
           );
         });
       });
@@ -400,7 +426,7 @@ bot.onText(/\/register/, async function (msg, match) {
 
 bot.onText(/\/serverwatch/, async function (msg, match) {
   const fromId = msg.from.id;
-  console.log('from server watch', adminId)
+  console.log("from server watch", adminId);
   if (fromId === Number(adminId)) {
     const rigNumbers = await rigState.distinct("rigNumber").exec();
     console.log(rigNumbers);
@@ -441,7 +467,6 @@ bot.onText(/\/serverstop/, async function (msg, match) {
   }
 });
 
-
 function stopwatching() {
   // остановить вывод через 1000 миллисекунд * 60 секунд * 1 минут
   const timeStop = 1000 * 60 * 1;
@@ -453,4 +478,3 @@ function stopwatching() {
 // Set interval request 1000 msec * 60 sec * 1 min
 const timeInterval = 1000 * 60 * 5;
 let timerId = setInterval(() => sendRequestRigs(), timeInterval);
-
