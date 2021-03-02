@@ -52,9 +52,9 @@ async function sendRequestRigs() {
               if (rigResponse !== rigs.rigStatus) {
                 switch (rigResponse) {
                   case 0: {
-                    console.log("To telegram", fromId);
+                    console.log("To telegram", element);
                     bot.sendMessage(
-                      fromId,
+                      element,
                       `Rig <b>${rigs.rigNumber}</b> is <b>offline</b>🔴`,
                       {
                         parse_mode: "HTML",
@@ -63,9 +63,9 @@ async function sendRequestRigs() {
                     break;
                   }
                   case 1: {
-                    console.log("To telegram", fromId);
+                    console.log("To telegram", element);
                     bot.sendMessage(
-                      fromId,
+                      element,
                       `Rig <b>${rigs.rigNumber}</b> is <b>online</b>🟢`,
                       {
                         parse_mode: "HTML",
@@ -74,9 +74,9 @@ async function sendRequestRigs() {
                     break;
                   }
                   case 2: {
-                    console.log("To telegram", fromId);
+                    console.log("To telegram", element);
                     bot.sendMessage(
-                      fromId,
+                      element,
                       `Rig <b>${rigs.rigNumber}</b> is online with errors❓`,
                       {
                         parse_mode: "HTML",
