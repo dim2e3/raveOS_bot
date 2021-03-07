@@ -49,13 +49,15 @@ async function sendRequestRigs() {
         rigs.forEach((rigs) => {
           const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
             (rigResponse) => {
-              if (rigResponse !== rigs.rigStatus) {
-                switch (rigResponse) {
+              const rigResp =
+                rigResponse.online_status && rigResponse.mpu_list.length && 1;
+              if (rigResp !== rigs.rigStatus) {
+                switch (rigResp) {
                   case 0: {
                     console.log("To telegram", element);
                     bot.sendMessage(
                       element,
-                      `Rig <b>${rigs.rigNumber}</b> is <b>offline</b>🔴`,
+                      `<b>${rigResponse.name} ${rigs.rigNumber}</b> is <b>offline</b>🔴`,
                       {
                         parse_mode: "HTML",
                       }
@@ -66,7 +68,7 @@ async function sendRequestRigs() {
                     console.log("To telegram", element);
                     bot.sendMessage(
                       element,
-                      `Rig <b>${rigs.rigNumber}</b> is <b>online</b>🟢`,
+                      `<b>${rigResponse.name} ${rigs.rigNumber}</b> is <b>online</b>🟢`,
                       {
                         parse_mode: "HTML",
                       }
@@ -77,7 +79,7 @@ async function sendRequestRigs() {
                     console.log("To telegram", element);
                     bot.sendMessage(
                       element,
-                      `Rig <b>${rigs.rigNumber}</b> is online with errors❓`,
+                      `<b>${rigResponse.name} ${rigs.rigNumber}</b> is online with errors❓`,
                       {
                         parse_mode: "HTML",
                       }
@@ -95,7 +97,7 @@ async function sendRequestRigs() {
                   { rigNumber: rigs.rigNumber },
                   {
                     $set: {
-                      rigStatus: rigResponse,
+                      rigStatus: rigResp,
                       rigCheckTime: currentCheckTime,
                     },
                   }
@@ -107,37 +109,89 @@ async function sendRequestRigs() {
       });
   });
 }
-async function getStatus(
-  req,
-  request_Token = "9efffce7-d616-4aa9-9fe5-fce8723a0214"
-) {
-  try {
-    const response = await axios.get(`${request_Url}${req}`, {
-      headers: {
-        "X-Auth-Token": request_Token,
-      },
-    });
-    const { data } = response;
 
-    const rigStatus = data.online_status;
-    const rigMpu = data.mpu_list.length;
-    console.log(
-      "from getStatus",
-      data.name,
-      " ",
-      data.id,
-      " Online status",
-      data.online_status,
-      " MPU number ",
-      data.mpu_list.length
-    );
+async function getStatus(req, request_Token = "") {
+  if (request_Token === "") {
+    return 2;
+  } else {
+    try {
+      const response = await axios.get(`${request_Url}${req}`, {
+        headers: {
+          "X-Auth-Token": request_Token,
+        },
+      });
+      const { data } = response;
+      const rigStatus = data.online_status;
+      const rigMpu = data.mpu_list.length;
+      const rigName = data.name;
+
+      console.log(
+        "GetStatus",
+        rigName,
+        " ",
+        data.id,
+        " Online status",
+        data.online_status,
+        " MPU number ",
+        data.mpu_list.length
+      );
+      return data;
+    } catch (error) {
+      console.error({ error });
+    }
     return rigStatus && rigMpu && 1;
-  } catch (error) {
-    console.error({ error });
   }
-  return rigStatus && rigMpu && 1;
 }
+async function getFullStatus(req, request_Token = "") {
+  console.log("Request fullstatus rig", req, "rig token", request_Token);
+  if (request_Token === "") {
+    return 2;
+  } else {
+    try {
+      const response = await axios.get(`${request_Url}${req}`, {
+        headers: {
+          "X-Auth-Token": request_Token,
+        },
+      });
+      const { data } = response;
 
+      return data;
+    } catch (error) {
+      return error.response.status;
+    }
+  }
+}
+function parseStatus(serverResponse) {
+  const rigStatus = {
+    id: serverResponse.id,
+    name: serverResponse.name,
+    online_status: serverResponse.online_status,
+    mb_info: serverResponse.sys_info.mb_info.mb_name,
+    cpu_info: serverResponse.sys_info.cpu_info.name,
+    boot_time: serverResponse.sys_info.boot_time,
+    coin_name: serverResponse.mining_info[0].coin_name,
+    pool_id: serverResponse.mining_info[0].pool_id,
+    power: [],
+    temp: [],
+    hashrate: [],
+    fan_percent: [],
+    fan_rpm: [],
+  };
+  const mpu_list = serverResponse.mpu_list.forEach((videocard) => {
+    rigStatus.temp = [...rigStatus.temp, videocard.temp];
+    rigStatus.hashrate = [...rigStatus.hashrate, videocard.hashrate];
+    rigStatus.fan_percent = [...rigStatus.fan_percent, videocard.fan_percent];
+    rigStatus.fan_rpm = [...rigStatus.fan_rpm, videocard.fan_rpm];
+    rigStatus.power = [...rigStatus.power, videocard.power];
+  });
+  return rigStatus;
+}
+function upTime(sec) {
+  const day = Math.trunc(sec / 86400);
+  const hour = Math.trunc((sec % 86400) / 3600);
+  const min = Math.trunc((sec - day * 86400 - hour * 3600) / 60);
+  return `${day}d:${hour}h:${min}m`;
+}
 const rigStateSchema = new mongoose.Schema(
   {
     id: {
@@ -156,6 +210,16 @@ const rigStateSchema = new mongoose.Schema(
     rigStatus: {
       type: Number,
       required: true,
+      default: 0,
+    },
+    rigTemp: {
+      type: Number,
+      required: false,
+      default: 0,
+    },
+    rigFan: {
+      type: Number,
+      required: false,
       default: 0,
     },
     rigCheckTime: { type: Date, default: Date.now },
@@ -210,230 +274,136 @@ const telegramId = mongoose.model("telegramId", telegramIdSchema);
 const bot = new TelegramBot(token, { polling: true });
 
 bot.on("message", async function (msg) {
-  const fromId = msg.from.id;
-  let rigNumbers = await telegramId.find(
-    { id: fromId },
-    {
-      _id: false,
-      is_bot: false,
-      id: false,
-      first_name: false,
-      last_name: false,
-      username: false,
-      rigNumber: false,
-      registerTime: false,
-    }
-  );
-  rigNumbers[0].rigNumbers.forEach((rigNumber) => {
-    if (rigNumber === msg.text) {
-      bot.sendMessage(fromId, `Type ${rigNumber} token`, {
-        reply_markup: {
-          force_reply: true,
-        },
-      });
-    }
-  });
-  if (msg.reply_to_message) {
-    const isBot = msg.reply_to_message.from.id;
-    const regexp = /[^\D]/g;
-    const setRig = msg.reply_to_message.text.match(regexp).join("");
-    console.log(setRig);
-    const setToken = msg.text;
-    if (isBot === Number(botId)) {
-      const newRigState = rigState
-        .updateOne({ rigNumber: setRig }, { $set: { rigToken: setToken } })
-        .exec()
-        .then((newStatus) => {
-          console.log(`Set ${setRig} ${setToken}`);
-          bot.sendMessage(fromId, `Set token ${setToken} to ${setRig} rig`);
+  const fromId = msg.from.id; // Получаем ID отправителя
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    rigNumbers[0].rigNumbers.forEach((rigNumber) => {
+      if (rigNumber === msg.text) {
+        bot.sendMessage(fromId, `Type ${rigNumber} token`, {
+          reply_markup: {
+            force_reply: true,
+          },
         });
+      }
+    });
+    if (msg.reply_to_message) {
+      const isBot = msg.reply_to_message.from.id;
+      const regexp = /[^\D]/g;
+      const setRig = msg.reply_to_message.text.match(regexp).join("");
+      console.log('Setting rig',setRig);
+      const setToken = msg.text;
+      if (`Type ${setRig} token` === msg.reply_to_message.text) {
+        if (isBot == botId) {
+          let newRig = await rigState.findOne({ rigNumber: setRig });
+          if (!newRig) {
+            const regexp = /^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/;
+            // const regexp = /\w{8}-\w{4}-\w{4}-\w{4}-\w{12}\z/
+            if (regexp.test(setToken)) {
+              getFullStatus(setRig, setToken).then((response) => {
+                if (response != "500") {
+                  if (response.online_status) {
+                    const newState = new rigState({
+                      id: fromId,
+                      rigNumber: setRig,
+                      rigToken: setToken,
+                      rigStatus: 0,
+                      rigTemp: 0,
+                      rigFan: 0,
+                    });
+                    newState.save();
+                    bot.sendMessage(
+                      fromId,
+                      `You add ${setRig} rig. Type /status`
+                    );
+                  } else {
+                    console.log(`error of add new ${setRig} rig from `, fromId);
+                    bot.sendMessage(
+                      fromId,
+                      `Add ${setRig} token failed, please enter correct token`
+                    );
+                  }
+                } else {
+                  console.log(`error of add new ${setRig} rig from `, fromId);
+                  bot.sendMessage(
+                    fromId,
+                    `Add ${setRig} token failed, please enter correct token`
+                  );
+                }
+              });
+            } else {
+              console.log(
+                `error in token ${setToken}  in ${setRig} from`,
+                fromId
+              );
+              bot.sendMessage(
+                fromId,
+                `${setToken} token failed, please enter correct token`
+              );
+            }
+          } else {
+            const newRigState = rigState
+              .updateOne(
+                { rigNumber: setRig },
+                { $set: { rigToken: setToken } }
+              )
+              .exec()
+              .then((newStatus) => {
+                console.log(`Set token ${setToken} to ${setRig} rig`);
+                bot.sendMessage(
+                  fromId,
+                  `Set token ${setToken} to ${setRig} rig`
+                );
+              });
+          }
+        }
+      }
     }
+  } else {
+    bot.sendMessage(fromId, `Please register`);
   }
 });
+
+// Функция добавления риг в список просмотра
 bot.onText(/\/watch (.+)/, async function (msg, match) {
   const fromId = msg.from.id;
   const rig = match[1];
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    const { id, is_bot, first_name, last_name, username } = msg.from;
 
-  const { id, is_bot, first_name, last_name, username } = msg.from;
-
-  let newRig = await rigState.findOne({ rigNumber: rig });
-  console.log(newRig);
-  if (!newRig) {
-    console.log("IF");
-    const newState = new rigState({
-      id: fromId,
-      rigNumber: rig,
-      rigToken: "",
-      rigStatus: 0,
-    });
-    await newState.save();
-    const newtelegramId = telegramId
-      .updateOne({ id: fromId }, { $addToSet: { rigNumbers: rig } })
-      .exec()
-      .then((newStatus) => console.log("Add new rigs", fromId, rig));
-    bot.sendMessage(fromId, `Start watching ${rig} rig`);
-  } else {
-    console.log("ELSE");
-    bot.sendMessage(fromId, `Rig already registered`);
-  }
-});
-
-bot.onText(/\/watchstop (.+)/, async function (msg, match) {
-  const fromId = msg.from.id;
-  const rig = match[1];
-  bot.sendMessage(fromId, `Stop watching ${rig} rig`);
-
-  const newtelegramId = telegramId
-    .updateOne({ id: fromId }, { $pull: { rigNumbers: rig } })
-    .exec()
-    .then((newStatus) => console.log("Remove rig", fromId, rig))
-    .catch(function (err) {
-      console.log(err);
-    });
-  console.log(newtelegramId);
-});
-
-bot.onText(/\/watchrig/, async function (msg, match) {
-  const fromId = msg.from.id;
-
-  let rigNumbers = await telegramId.find(
-    { id: fromId },
-    {
-      _id: false,
-      is_bot: false,
-      id: false,
-      first_name: false,
-      last_name: false,
-      username: false,
-      rigNumber: false,
-      registerTime: false,
-    }
-  );
-  const resp = rigNumbers[0].rigNumbers;
-  console.log(`User ${fromId} watch ${resp}`);
-  bot.sendMessage(fromId, `You watching ${resp} rig`);
-});
-bot.onText(/\/status/, async function (msg, match) {
-  const fromId = msg.from.id;
-  let rigNumbers = await telegramId.find(
-    { id: fromId },
-    {
-      _id: false,
-      is_bot: false,
-      id: false,
-      first_name: false,
-      last_name: false,
-      username: false,
-      rigNumber: false,
-      registerTime: false,
-    }
-  );
-  console.log("Massive ", rigNumbers[0].rigNumbers);
-  const resp = rigNumbers[0].rigNumbers.forEach((element) => {
-    const rigs = rigState
-      .find(
-        { rigNumber: element },
-        {
-          _id: false,
-          id: false,
-        }
-      )
-      .exec()
-      .then((rigs) => {
-        rigs.forEach((rigs) => {
-          const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
-            (rigResponse) => {
-              switch (rigResponse) {
-                case 0: {
-                  console.log("To telegram", fromId);
-                  bot.sendMessage(
-                    fromId,
-                    `Rig <b>${rigs.rigNumber}</b> is <b>offline</b>🔴`,
-                    {
-                      parse_mode: "HTML",
-                    }
-                  );
-                  break;
-                }
-                case 1: {
-                  console.log("To telegram", fromId);
-                  bot.sendMessage(
-                    fromId,
-                    `Rig <b>${rigs.rigNumber}</b> is <b>online</b>🟢`,
-                    {
-                      parse_mode: "HTML",
-                    }
-                  );
-                  break;
-                }
-                case 2: {
-                  console.log("To telegram", fromId);
-                  bot.sendMessage(
-                    fromId,
-                    `Rig <b>${rigs.rigNumber}</b> is online with errors❓`,
-                    {
-                      parse_mode: "HTML",
-                    }
-                  );
-                  break;
-                }
-
-                default:
-                  console.log("State unknown");
-              }
-              const currentCheckTime = new Date();
-              const newStatus = rigState
-                .updateOne(
-                  { rigNumber: rigs.rigNumber },
-                  {
-                    $set: {
-                      rigStatus: rigResponse,
-                      rigCheckTime: currentCheckTime,
-                    },
-                  }
-                )
-                .exec();
-            }
-          );
-        });
+    let newRig = await rigState.findOne({ rigNumber: rig });
+    if (!newRig) {
+      const newtelegramId = telegramId
+        .updateOne({ id: fromId }, { $addToSet: { rigNumbers: rig } })
+        .exec()
+        .then((newStatus) => console.log("Add new rigs", fromId, rig));
+      bot.sendMessage(fromId, `Start watching ${rig} rig`);
+      bot.sendMessage(fromId, `Please select ${rig} to send token`, {
+        reply_markup: {
+          keyboard: [[rig]],
+        },
       });
-  });
-});
-bot.onText(/\/register/, async function (msg, match) {
-  const fromId = msg.from.id;
-  const { id, is_bot, first_name, last_name, username } = msg.from;
-
-  let user = await telegramId.findOne({ id: fromId });
-  if (!user) {
-    const newId = new telegramId({
-      id,
-      is_bot,
-      first_name,
-      last_name,
-      username,
-      rigNumbers: [],
-    });
-    await newId.save((err, result) => {
-      if (err) {
-        console.log("Unable update user: ", err);
-      }
-    });
-    bot.sendMessage(fromId, `You register to watch rigs`);
+    } else {
+      bot.sendMessage(fromId, `Rig already registered`);
+    }
   } else {
-    bot.sendMessage(fromId, `You already registered`);
+    bot.sendMessage(fromId, `Please register to add rigs`);
   }
 });
-
-bot.onText(/\/serverwatch/, async function (msg, match) {
-  const fromId = msg.from.id;
-  console.log("from server watch", adminId);
-  if (fromId === Number(adminId)) {
-    const rigNumbers = await rigState.distinct("rigNumber").exec();
-    console.log(rigNumbers);
-    bot.sendMessage(fromId, `Server now watching ${rigNumbers}`);
-  }
-});
-
+// Функция установки токена для риг
 bot.onText(/\/token/, async function (msg, match) {
   const fromId = msg.from.id;
   let rigNumbers = await telegramId.find(
@@ -449,32 +419,355 @@ bot.onText(/\/token/, async function (msg, match) {
       registerTime: false,
     }
   );
-
-  console.log(rigNumbers[0].rigNumbers);
-  bot.sendMessage(fromId, "Select rig to enter token", {
-    reply_markup: {
-      keyboard: [rigNumbers[0].rigNumbers],
-    },
-  });
-});
-
-bot.onText(/\/serverstop/, async function (msg, match) {
-  const fromId = msg.from.id; // Получаем ID отправителя
-  if (fromId === adminId) {
-    console.log("Server stop watching");
-    stopwatching();
-    bot.sendMessage(fromId, `Server stop watching`);
+  console.log('Set token',rigNumbers[0].rigNumbers);
+  if (rigNumbers[0].rigNumbers.length === 0) {
+    bot.sendMessage(fromId, "Please add any rig by /watch command");
+  } else {
+    bot.sendMessage(fromId, "Select rig to change token", {
+      reply_markup: {
+        keyboard: [rigNumbers[0].rigNumbers],
+      },
+    });
   }
 });
 
-function stopwatching() {
-  // остановить вывод через 1000 миллисекунд * 60 секунд * 1 минут
-  const timeStop = 1000 * 60 * 1;
-  setTimeout(() => {
-    clearInterval(timerId);
-  }, timeStop);
-}
+// Функция удаления риг из списка просмотра
+bot.onText(/\/watchstop (.+)/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const rig = match[1];
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    if (rigNumbers[0].rigNumbers.includes(rig)) {
+      const newtelegramId = telegramId
+        .updateOne({ id: fromId }, { $pull: { rigNumbers: rig } })
+        .exec()
+        .then((newStatus) => console.log("Remove rig", fromId, rig))
+        .catch(function (err) {
+          console.log(err);
+        });
+      const res = await rigState.deleteOne({ rigNumber: rig });
+      bot.sendMessage(fromId, `Stop watching ${rig} rig`);
+    } else {
+      bot.sendMessage(fromId, `You rigs list not includes ${rig} rig`);
+    }
+  } else {
+    bot.sendMessage(fromId, `Please register to remove watching rigs`);
+  }
+});
 
-// Set interval request 1000 msec * 60 sec * 1 min
+// Функция вывода списка просматриваемых риг
+bot.onText(/\/watchrig/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    const resp = rigNumbers[0].rigNumbers;
+    if (resp != 0) {
+      console.log(`User ${fromId} watch ${resp}`);
+      bot.sendMessage(fromId, `You watching ${resp} rig`);
+    } else {
+      bot.sendMessage(fromId, `Nothing to see, please add rig to watch`);
+    }
+  } else {
+    bot.sendMessage(fromId, `Please register to watch rigs`);
+  }
+});
+
+// Функция опроса статуса зарегистрированых риг
+bot.onText(/\/status/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    console.log("Request status rigs", rigNumbers[0].rigNumbers);
+    const resp = rigNumbers[0].rigNumbers.forEach((element) => {
+      const rigs = rigState
+        .find(
+          { rigNumber: element },
+          {
+            _id: false,
+            id: false,
+          }
+        )
+        .exec()
+        .then((rigs) => {
+          rigs.forEach((rigs) => {
+            const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
+              (rigResponse) => {
+                const rigResp =
+                  rigResponse.online_status && rigResponse.mpu_list.length && 1;
+                switch (rigResp) {
+                  case 0: {
+                    console.log("To telegram", fromId);
+                    bot.sendMessage(
+                      fromId,
+                      `<b>${rigResponse.name} ${rigs.rigNumber}</b> is <b>offline</b>🔴`,
+                      {
+                        parse_mode: "HTML",
+                      }
+                    );
+                    break;
+                  }
+                  case 1: {
+                    console.log("To telegram", fromId);
+                    bot.sendMessage(
+                      fromId,
+                      `<b>${rigResponse.name} ${rigs.rigNumber}</b> is <b>online</b>🟢`,
+                      {
+                        parse_mode: "HTML",
+                      }
+                    );
+                    break;
+                  }
+                  case 2: {
+                    console.log("To telegram", fromId);
+                    bot.sendMessage(
+                      fromId,
+                      `<b>${rigResponse.name} ${rigs.rigNumber}</b> is online with errors❓`,
+                      {
+                        parse_mode: "HTML",
+                      }
+                    );
+                    break;
+                  }
+
+                  default:
+                    console.log("State unknown");
+                }
+
+                const currentCheckTime = new Date();
+                const newStatus = rigState
+                  .updateOne(
+                    { rigNumber: rigs.rigNumber },
+                    {
+                      $set: {
+                        rigStatus: rigResp,
+                        rigCheckTime: currentCheckTime,
+                      },
+                    }
+                  )
+                  .exec();
+              }
+            );
+          });
+        });
+    });
+  } else {
+    bot.sendMessage(fromId, `Please register to watch status rigs`);
+  }
+});
+
+// Функция регистрации пользователя
+bot.onText(/\/register/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const { id, is_bot, first_name, last_name, username } = msg.from;
+  const user = await telegramId.findOne({ id: fromId });
+  if (!user) {
+    const newId = new telegramId({
+      id,
+      is_bot,
+      first_name,
+      last_name,
+      username,
+      rigNumbers: [],
+    });
+    await newId.save((err, result) => {
+      if (err) {
+        console.log("Unable update user: ", err);
+      }
+    });
+    bot.sendMessage(
+      fromId,
+      `You register to watch rigs, type /help to see available commands`
+    );
+  } else {
+    bot.sendMessage(fromId, `You already registered`);
+  }
+});
+
+// Функция удаления пользователя
+bot.onText(/\/unregister/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const user = await telegramId.findOne({ id: fromId });
+
+  if (user) {
+    console.log(`${fromId} deleted`);
+    let res = await telegramId.deleteOne({ id: fromId });
+    let rig = await rigState.deleteMany({ id: fromId });
+    bot.sendMessage(fromId, `You id and rigs deleted`);
+  } else {
+    bot.sendMessage(fromId, "You not registered");
+  }
+});
+// Функция выдачи помощи
+bot.onText(/\/help/, async function (msg, match) {
+  const fromId = msg.from.id; // Получаем ID отправителя
+  const user = await telegramId.findOne({ id: fromId });
+  const textConst = `
+/register - register you telegramID on server to watch status rig
+/unregister - delete you telegramID from the server
+/watch <b>num</b>  - add Rig to watchlist, where <b>num</b> is number of you Rig ex. /watch 999999
+/watchstop <b>num</b> - remove Rig from watchlist
+/watchrig  - request numbers of watching rigs
+/status -  request status rig from watchlist
+/fstatus <b>num</b> - request full status of <b>num</b> rig
+/token - change rig token
+/help - this help
+`;
+  if (user) {
+    bot.sendMessage(fromId, textConst, {
+      parse_mode: "HTML",
+    });
+  }
+});
+
+bot.onText(/\/serverwatch/, async function (msg, match) {
+  const fromId = msg.from.id;
+  if (fromId == adminId) {
+    const rigNumbers = await rigState.distinct("rigNumber").exec();
+    bot.sendMessage(fromId, `Server now watching ${rigNumbers}`);
+  }
+});
+
+// Функция просмотра полного статуса риги
+bot.onText(/\/fstatus (.+)/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const rig = match[1];
+  if (fromId == adminId) {
+    console.log(`Request fullstatus ${rig}`);
+    const rigs = await rigState
+      .find(
+        { rigNumber: rig },
+        {
+          _id: false,
+          id: false,
+        }
+      )
+      .exec()
+      .then((rigs) => {
+        const rigResponse = getFullStatus(
+          rigs[0].rigNumber,
+          rigs[0].rigToken
+        ).then((response) => {
+          const rigStatus = parseStatus(response);
+          const textConst = `
+          <b>ℹ️ID: </b><i>${rigStatus.id}</i> <b>Name: </b><i>${
+            rigStatus.name
+          }</i>
+<b>CPU: </b><i>${rigStatus.cpu_info}</i>
+<b>MB: </b><i>${rigStatus.mb_info}</i>
+<b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
+<b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
+<b>🔥Temp °C: </b><i>${rigStatus.temp}</i> <b></b>
+<b>❄️Fan %: </b><i>${rigStatus.fan_percent}</i> <b></b>
+<b>💰Hashrate: </b><i>${rigStatus.hashrate.map(
+            (item) => Math.ceil(item / 100000) / 10
+          )}</i> <b>MH/s</b>
+          `;
+          bot.sendMessage(fromId, textConst, {
+            parse_mode: "HTML",
+          });
+        });
+      });
+  } else {
+    const user = await telegramId.findOne({ id: fromId });
+    if (user) {
+      let rigNumbers = await telegramId
+        .find(
+          { id: fromId },
+          {
+            _id: false,
+            is_bot: false,
+            id: false,
+            first_name: false,
+            last_name: false,
+            username: false,
+            rigNumber: false,
+            registerTime: false,
+          }
+        )
+        .then((res) => {
+          if (res[0].rigNumbers.includes(rig)) {
+            console.log(`Request fullstatus ${rig}`);
+            const rigs = rigState
+              .find(
+                { rigNumber: rig },
+                {
+                  _id: false,
+                  id: false,
+                }
+              )
+              .exec()
+              .then((rigs) => {
+                const rigResponse = getFullStatus(
+                  rigs[0].rigNumber,
+                  rigs[0].rigToken
+                ).then((response) => {
+                  const rigStatus = parseStatus(response);
+                  const textConst = `
+          <b>ℹ️ID: </b><i>${rigStatus.id}</i> <b>Name: </b><i>${
+                    rigStatus.name
+                  }</i>
+<b>CPU: </b><i>${rigStatus.cpu_info}</i>
+<b>MB: </b><i>${rigStatus.mb_info}</i>
+<b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
+<b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
+<b>🔥Temp °C: </b><i>${rigStatus.temp}</i> <b></b>
+<b>❄️Fan %: </b><i>${rigStatus.fan_percent}</i> <b></b>
+<b>💰Hashrate: </b><i>${rigStatus.hashrate.map(
+                    (item) => Math.ceil(item / 100000) / 10
+                  )}</i> <b>MH/s</b>
+          `;
+                  bot.sendMessage(fromId, textConst, {
+                    parse_mode: "HTML",
+                  });
+                });
+              });
+          }
+        });
+    } else {
+      bot.sendMessage(fromId, "You dont register this rig");
+    }
+  }
+});
+
+// Set interval request 1000 msec * 60 sec * 5 min
 const timeInterval = 1000 * 60 * 5;
 let timerId = setInterval(() => sendRequestRigs(), timeInterval);
