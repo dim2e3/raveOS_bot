@@ -593,7 +593,173 @@ bot.onText(/\/status/, async function (msg, match) {
     bot.sendMessage(fromId, `Please register to watch status rigs`);
   }
 });
-
+// Функция опроса полного статуса зарегистрированых риг
+bot.onText(/\/fullstatus/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    console.log("Request fullstatus rigs", rigNumbers[0].rigNumbers);
+    const resp = rigNumbers[0].rigNumbers.forEach((element) => {
+      const rigs = rigState
+        .find(
+          { rigNumber: element },
+          {
+            _id: false,
+            id: false,
+          }
+        )
+        .exec()
+        .then((rigs) => {
+          const rigResponse = getFullStatus(
+            rigs[0].rigNumber,
+            rigs[0].rigToken
+          ).then((response) => {
+            const rigStatus = parseStatus(response);
+            const textConst = `
+          <b>ℹ️ID: </b><i>${rigStatus.id}</i> <b>Name: </b><i>${
+              rigStatus.name
+            }</i>
+<b>CPU: </b><i>${rigStatus.cpu_info}</i>
+<b>MB: </b><i>${rigStatus.mb_info}</i>
+<b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
+<b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
+<b>🔥Temp °C: </b><i>${rigStatus.temp}</i> <b></b>
+<b>❄️Fan %: </b><i>${rigStatus.fan_percent}</i> <b></b>
+<b>💰Hashrate: </b><i>${rigStatus.hashrate.map(
+              (item) => Math.ceil(item / 100000) / 10
+            )}</i> <b>MH/s</b>
+          `;
+            bot.sendMessage(fromId, textConst, {
+              parse_mode: "HTML",
+            });
+          });
+        });
+    });
+  } else {
+    bot.sendMessage(fromId, `Please register to watch status rigs`);
+  }
+});
+// Функция опроса температуры зарегистрированых риг
+bot.onText(/\/temp/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    console.log("Request fullstatus rigs", rigNumbers[0].rigNumbers);
+    const resp = rigNumbers[0].rigNumbers.forEach((element) => {
+      const rigs = rigState
+        .find(
+          { rigNumber: element },
+          {
+            _id: false,
+            id: false,
+          }
+        )
+        .exec()
+        .then((rigs) => {
+          const rigResponse = getFullStatus(
+            rigs[0].rigNumber,
+            rigs[0].rigToken
+          ).then((response) => {
+            const rigStatus = parseStatus(response);
+            const textConst = `
+          <b>ℹ️ID: </b><i>${rigStatus.id}</i> <b>Name: </b><i>${
+              rigStatus.name
+            }</i>
+<b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
+<b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
+<b>🔥Temp °C: </b><i>${rigStatus.temp}</i> <b></b>
+<b>❄️Fan %: </b><i>${rigStatus.fan_percent}</i> <b></b>
+          `;
+            bot.sendMessage(fromId, textConst, {
+              parse_mode: "HTML",
+            });
+          });
+        });
+    });
+  } else {
+    bot.sendMessage(fromId, `Please register to watch status rigs`);
+  }
+});
+// Функция опроса hash зарегистрированых риг
+bot.onText(/\/hashrate/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    console.log("Request fullstatus rigs", rigNumbers[0].rigNumbers);
+    const resp = rigNumbers[0].rigNumbers.forEach((element) => {
+      const rigs = rigState
+        .find(
+          { rigNumber: element },
+          {
+            _id: false,
+            id: false,
+          }
+        )
+        .exec()
+        .then((rigs) => {
+          const rigResponse = getFullStatus(
+            rigs[0].rigNumber,
+            rigs[0].rigToken
+          ).then((response) => {
+            const rigStatus = parseStatus(response);
+            const textConst = `
+          <b>ℹ️ID: </b><i>${rigStatus.id}</i> <b>Name: </b><i>${
+              rigStatus.name
+            }</i>
+<b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
+<b>💰Hashrate: </b><i>${rigStatus.hashrate.map(
+              (item) => Math.ceil(item / 100000) / 10
+            )}</i> <b>MH/s</b>
+          `;
+            bot.sendMessage(fromId, textConst, {
+              parse_mode: "HTML",
+            });
+          });
+        });
+    });
+  } else {
+    bot.sendMessage(fromId, `Please register to watch status rigs`);
+  }
+});
 // Функция регистрации пользователя
 bot.onText(/\/register/, async function (msg, match) {
   const fromId = msg.from.id;
@@ -648,6 +814,9 @@ bot.onText(/\/help/, async function (msg, match) {
 /watchrig  - request numbers of watching rigs
 /status -  request status rig from watchlist
 /fstatus <b>num</b> - request full status of <b>num</b> rig
+/fullstatus - request full status of watching rigs
+/temp - temperature, uptime, power and fan percentage of watching rigs
+/hashrate - hashrate, uptime of watching rigs
 /token - change rig token
 /help - this help
 `;
@@ -662,7 +831,7 @@ bot.onText(/\/serverwatch/, async function (msg, match) {
   const fromId = msg.from.id;
   if (fromId == adminId) {
     const rigNumbers = await rigState.distinct("rigNumber").exec();
-    bot.sendMessage(fromId, `Server now watching ${rigNumbers}`);
+    bot.sendMessage(fromId, `Server now watching ${rigNumbers.length} rigs, they are ${rigNumbers}`);
   }
 });
 
