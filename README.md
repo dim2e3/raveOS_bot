@@ -10,5 +10,9 @@ Available commands:
 /watchrig  - request numbers of watching rigs
 /status -  request status rig from watchlist
 /fstatus <b>num</b> - request full status of <b>num</b> rig
+/fullstatus - request full status of watching rigs
+/temp - temperature, uptime, power and fan percentage of watching rigs
+/hashrate - hashrate, uptime of watching rigs
+/token - change rig token
 /token - change rig token
 /help - help

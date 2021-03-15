@@ -49,6 +49,40 @@ async function sendRequestRigs() {
         rigs.forEach((rigs) => {
           const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
             (rigResponse) => {
+              // Проверка температуры видеокарт
+              if (
+                parseStatus(rigResponse).temp.reduce(
+                  (acc, rec) => acc || rec > rigs.rigTemp,
+                  false
+                )
+              ) {
+                sendMessage(
+                  element,
+                  `<b>🔥Warning ${rigResponse.name} ${
+                    rigs.rigNumber
+                  } 🔥</b>${boldStr(
+                    parseStatus(rigResponse).temp,
+                    rigs.rigTemp
+                  )} °C`
+                );
+              }
+              // Проверка вращения вентиляторов
+              if (
+                parseStatus(rigResponse).fan_percent.reduce(
+                  (acc, rec) => acc || rec < rigs.rigFan,
+                  false
+                )
+              ) {
+                sendMessage(
+                  element,
+                  `<b>❄️Warning ${rigResponse.name} ${
+                    rigs.rigNumber
+                  } ❄️</b>${boldStr(
+                    parseStatus(rigResponse).fan_percent,
+                    rigs.rigFan
+                  )} %`
+                );
+              }
               const rigResp =
                 rigResponse.online_status && rigResponse.mpu_list.length && 1;
               if (rigResp !== rigs.rigStatus) {
@@ -192,6 +226,23 @@ function upTime(sec) {
   const min = Math.trunc((sec - day * 86400 - hour * 3600) / 60);
   return `${day}d:${hour}h:${min}m`;
 }
+function boldStr(array, number) {
+  return `${array.map((item) => {
+    if (item > number) {
+      return `<b>${item}</b>`;
+    } else {
+      return `<i>${item}</i>`;
+    }
+  })}`;
+}
+async function sendMessage(userID, userMessage) {
+  bot
+    .getChat(userID)
+    .then(console.log("USER ID found", userID)).then(bot.sendMessage(userID, userMessage, {
+      parse_mode: "HTML",
+    }))
+
+}
 const rigStateSchema = new mongoose.Schema(
   {
     id: {
@@ -215,7 +266,7 @@ const rigStateSchema = new mongoose.Schema(
     rigTemp: {
       type: Number,
       required: false,
-      default: 0,
+      default: 99,
     },
     rigFan: {
       type: Number,
@@ -303,14 +354,13 @@ bot.on("message", async function (msg) {
       const isBot = msg.reply_to_message.from.id;
       const regexp = /[^\D]/g;
       const setRig = msg.reply_to_message.text.match(regexp).join("");
-      console.log('Setting rig',setRig);
+      console.log("Setting rig", setRig);
       const setToken = msg.text;
       if (`Type ${setRig} token` === msg.reply_to_message.text) {
         if (isBot == botId) {
           let newRig = await rigState.findOne({ rigNumber: setRig });
           if (!newRig) {
-            const regexp = /^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}/;
-            // const regexp = /\w{8}-\w{4}-\w{4}-\w{4}-\w{12}\z/
+            const regexp = /^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$/;
             if (regexp.test(setToken)) {
               getFullStatus(setRig, setToken).then((response) => {
                 if (response != "500") {
@@ -419,7 +469,7 @@ bot.onText(/\/token/, async function (msg, match) {
       registerTime: false,
     }
   );
-  console.log('Set token',rigNumbers[0].rigNumbers);
+  console.log("Set token", rigNumbers[0].rigNumbers);
   if (rigNumbers[0].rigNumbers.length === 0) {
     bot.sendMessage(fromId, "Please add any rig by /watch command");
   } else {
@@ -636,8 +686,8 @@ bot.onText(/\/fullstatus/, async function (msg, match) {
 <b>MB: </b><i>${rigStatus.mb_info}</i>
 <b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
 <b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
-<b>🔥Temp °C: </b><i>${rigStatus.temp}</i> <b></b>
-<b>❄️Fan %: </b><i>${rigStatus.fan_percent}</i> <b></b>
+<b>🔥Temp °C: </b><i>${boldStr(rigStatus.temp, rigs[0].rigTemp)}</i> <b></b>
+<b>❄️Fan %: </b><i>${boldStr(rigStatus.fan_percent, rigs[0].rigFan)}</i> <b></b>
 <b>💰Hashrate: </b><i>${rigStatus.hashrate.map(
               (item) => Math.ceil(item / 100000) / 10
             )}</i> <b>MH/s</b>
@@ -693,8 +743,8 @@ bot.onText(/\/temp/, async function (msg, match) {
             }</i>
 <b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
 <b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
-<b>🔥Temp °C: </b><i>${rigStatus.temp}</i> <b></b>
-<b>❄️Fan %: </b><i>${rigStatus.fan_percent}</i> <b></b>
+<b>🔥Temp °C: </b><i>${boldStr(rigStatus.temp, rigs[0].rigTemp)}</i> <b></b>
+<b>❄️Fan %: </b><i>${boldStr(rigStatus.fan_percent, rigs[0].rigFan)}</i> <b></b>
           `;
             bot.sendMessage(fromId, textConst, {
               parse_mode: "HTML",
@@ -704,6 +754,92 @@ bot.onText(/\/temp/, async function (msg, match) {
     });
   } else {
     bot.sendMessage(fromId, `Please register to watch status rigs`);
+  }
+});
+// Функция установки температуры перегрева риг
+bot.onText(/\/settemp (\d{6}) (\d{2})$/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const setRig = match[1];
+  const setTemp = match[2];
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    if (rigNumbers[0].rigNumbers.includes(setRig)) {
+      const res = await rigState.updateOne(
+        { rigNumber: setRig },
+        {
+          $set: {
+            rigTemp: setTemp,
+          },
+        }
+      );
+      bot.sendMessage(
+        fromId,
+        `Set warning Temperature 🔥  <b>${setTemp} °C</b> to  <b>${setRig}</b> rig`,
+        {
+          parse_mode: "HTML",
+        }
+      );
+    } else {
+      bot.sendMessage(fromId, `You rigs list not includes ${rig} rig`);
+    }
+  } else {
+    bot.sendMessage(fromId, `Please register to remove watching rigs`);
+  }
+});
+// Функция установки температуры перегрева риг
+bot.onText(/\/setfan (\d{6}) (\d{2})$/, async function (msg, match) {
+  const fromId = msg.from.id;
+  const setRig = match[1];
+  const setFan = match[2];
+  const user = await telegramId.findOne({ id: fromId });
+  if (user) {
+    let rigNumbers = await telegramId.find(
+      { id: fromId },
+      {
+        _id: false,
+        is_bot: false,
+        id: false,
+        first_name: false,
+        last_name: false,
+        username: false,
+        rigNumber: false,
+        registerTime: false,
+      }
+    );
+    if (rigNumbers[0].rigNumbers.includes(setRig)) {
+      const res = await rigState.updateOne(
+        { rigNumber: setRig },
+        {
+          $set: {
+            rigFan: setFan,
+          },
+        }
+      );
+      bot.sendMessage(
+        fromId,
+        `Set warning Fan ❄️<b>${setFan} %</b> to  <b>${setRig}</b> rig`,
+        {
+          parse_mode: "HTML",
+        }
+      );
+    } else {
+      bot.sendMessage(fromId, `You rigs list not includes ${rig} rig`);
+    }
+  } else {
+    bot.sendMessage(fromId, `Please register to remove watching rigs`);
   }
 });
 // Функция опроса hash зарегистрированых риг
@@ -817,6 +953,8 @@ bot.onText(/\/help/, async function (msg, match) {
 /fullstatus - request full status of watching rigs
 /temp - temperature, uptime, power and fan percentage of watching rigs
 /hashrate - hashrate, uptime of watching rigs
+/settemp <b>num</b> <b>temp</b> - set warning temperature for rig
+/setfan <b>num</b> <b>fan</b> - set warning % fan for rig
 /token - change rig token
 /help - this help
 `;
@@ -831,7 +969,10 @@ bot.onText(/\/serverwatch/, async function (msg, match) {
   const fromId = msg.from.id;
   if (fromId == adminId) {
     const rigNumbers = await rigState.distinct("rigNumber").exec();
-    bot.sendMessage(fromId, `Server now watching ${rigNumbers.length} rigs, they are ${rigNumbers}`);
+    bot.sendMessage(
+      fromId,
+      `Server now watching ${rigNumbers.length} rigs, they are ${rigNumbers}`
+    );
   }
 });
 
@@ -864,8 +1005,8 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
 <b>MB: </b><i>${rigStatus.mb_info}</i>
 <b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
 <b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
-<b>🔥Temp °C: </b><i>${rigStatus.temp}</i> <b></b>
-<b>❄️Fan %: </b><i>${rigStatus.fan_percent}</i> <b></b>
+<b>🔥Temp °C: </b><i>${boldStr(rigStatus.temp, rigs[0].rigTemp)}</i> <b></b>
+<b>❄️Fan %: </b><i>${boldStr(rigStatus.fan_percent, rigs[0].rigFan)}</i> <b></b>
 <b>💰Hashrate: </b><i>${rigStatus.hashrate.map(
             (item) => Math.ceil(item / 100000) / 10
           )}</i> <b>MH/s</b>
@@ -918,8 +1059,8 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
 <b>MB: </b><i>${rigStatus.mb_info}</i>
 <b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
 <b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
-<b>🔥Temp °C: </b><i>${rigStatus.temp}</i> <b></b>
-<b>❄️Fan %: </b><i>${rigStatus.fan_percent}</i> <b></b>
+<b>🔥Temp °C: </b><i>${boldStr(rigStatus.temp, rigs[0].rigTemp)}</i> <b></b>
+<b>❄️Fan %: </b><i>${boldStr(rigStatus.fan_percent, rigs[0].rigFan)}</i> <b></b>
 <b>💰Hashrate: </b><i>${rigStatus.hashrate.map(
                     (item) => Math.ceil(item / 100000) / 10
                   )}</i> <b>MH/s</b>
@@ -938,5 +1079,5 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
 });
 
 // Set interval request 1000 msec * 60 sec * 5 min
-const timeInterval = 1000 * 60 * 5;
+const timeInterval = 1000 * 60 * 1;
 let timerId = setInterval(() => sendRequestRigs(), timeInterval);
