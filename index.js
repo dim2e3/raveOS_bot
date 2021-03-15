@@ -238,7 +238,7 @@ function boldStr(array, number) {
 async function sendMessage(userID, userMessage) {
   bot
     .getChat(userID)
-    .then(console.log("USER ID found", userID)).then(bot.sendMessage(userID, userMessage, {
+    .then(bot.sendMessage(userID, userMessage, {
       parse_mode: "HTML",
     }))
 
@@ -1079,5 +1079,5 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
 });
 
 // Set interval request 1000 msec * 60 sec * 5 min
-const timeInterval = 1000 * 60 * 1;
+const timeInterval = 1000 * 60 * 5;
 let timerId = setInterval(() => sendRequestRigs(), timeInterval);
