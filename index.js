@@ -370,8 +370,8 @@ bot.on("message", async function (msg) {
                       rigNumber: setRig,
                       rigToken: setToken,
                       rigStatus: 0,
-                      rigTemp: 0,
-                      rigFan: 0,
+                      rigTemp: 70,
+                      rigFan: 10,
                     });
                     newState.save();
                     bot.sendMessage(
@@ -954,9 +954,11 @@ bot.onText(/\/help/, async function (msg, match) {
 /temp - temperature, uptime, power and fan percentage of watching rigs
 /hashrate - hashrate, uptime of watching rigs
 /settemp <b>num</b> <b>temp</b> - set warning temperature for rig
-/setfan <b>num</b> <b>fan</b> - set warning % fan for rig
+/setfan <b>num</b> <b>fan</b> - set warning fan percentage for rig
 /token - change rig token
 /help - this help
+
+for help and questions @MyRave_bot_support
 `;
   if (user) {
     bot.sendMessage(fromId, textConst, {
