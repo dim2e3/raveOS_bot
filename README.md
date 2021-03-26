@@ -13,6 +13,9 @@ Available commands:
 /fullstatus - request full status of watching rigs
 /temp - temperature, uptime, power and fan percentage of watching rigs
 /hashrate - hashrate, uptime of watching rigs
+/settemp <b>num</b> <b>temp</b> - set warning temperature for rig
+/setfan <b>num</b> <b>fan</b> - set warning fan percentage for rig
 /token - change rig token
-/token - change rig token
-/help - help
+/help - this help
+
+for help and questions @MyRave_bot_support

@@ -49,10 +49,11 @@ async function sendRequestRigs() {
         rigs.forEach((rigs) => {
           const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
             (rigResponse) => {
+              saveStat(parseStatus(rigResponse));
               // Проверка температуры видеокарт
               if (
                 parseStatus(rigResponse).temp.reduce(
-                  (acc, rec) => acc || rec > rigs.rigTemp,
+                  (acc, rec) => acc || rec >= rigs.rigTemp,
                   false
                 )
               ) {
@@ -235,13 +236,30 @@ function boldStr(array, number) {
     }
   })}`;
 }
+async function saveStat(serverResponse) {
+  const newData = new rigData({
+    id: serverResponse.id,
+    rigDate: Date.now(),
+    rigOnline_status: serverResponse.online_status,
+    rigPower: serverResponse.power,
+    rigTemp: serverResponse.temp,
+    rigHashrate: serverResponse.hashrate,
+    rigFan_percent: serverResponse.fan_percent,
+    rigFan_rpm: serverResponse.fan_rpm,
+  });
+  // console.log(newData)
+  await newData.save((err, result) => {
+    if (err) {
+      console.log("Unable update rigData: ", err);
+    }
+  });
+}
 async function sendMessage(userID, userMessage) {
-  bot
-    .getChat(userID)
-    .then(bot.sendMessage(userID, userMessage, {
+  bot.getChat(userID).then(
+    bot.sendMessage(userID, userMessage, {
       parse_mode: "HTML",
-    }))
-
+    })
+  );
 }
 const rigStateSchema = new mongoose.Schema(
   {
@@ -319,8 +337,50 @@ const telegramIdSchema = new mongoose.Schema(
     timestamp: true,
   }
 );
+const rigDataSchema = new mongoose.Schema(
+  {
+    id: {
+      type: Number,
+      required: true,
+    },
+    rigTime: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    rigOnline_status: {
+      type: Number,
+      required: true,
+    },
+    rigPower: {
+      type: [],
+      required: false,
+    },
+    rigTemp: {
+      type: [],
+      required: false,
+    },
+    rigHashrate: {
+      type: [],
+      required: false,
+    },
+    rigFan_percent: {
+      type: [],
+      required: false,
+    },
+    rigFan_rpm: {
+      type: [],
+      required: false,
+    },
+  },
+  {
+    versionKey: false,
+    timestamp: true,
+  }
+);
 const rigState = mongoose.model("rigState", rigStateSchema);
 const telegramId = mongoose.model("telegramId", telegramIdSchema);
+const rigData = mongoose.model("rigdata", rigDataSchema);
 
 const bot = new TelegramBot(token, { polling: true });
 
@@ -757,7 +817,7 @@ bot.onText(/\/temp/, async function (msg, match) {
   }
 });
 // Функция установки температуры перегрева риг
-bot.onText(/\/settemp (\d{6}) (\d{2})$/, async function (msg, match) {
+bot.onText(/\/settemp (\d{6}) (\d{1,2})$/, async function (msg, match) {
   const fromId = msg.from.id;
   const setRig = match[1];
   const setTemp = match[2];
@@ -800,7 +860,7 @@ bot.onText(/\/settemp (\d{6}) (\d{2})$/, async function (msg, match) {
   }
 });
 // Функция установки температуры перегрева риг
-bot.onText(/\/setfan (\d{6}) (\d{2})$/, async function (msg, match) {
+bot.onText(/\/setfan (\d{6}) (\d{1,2})$/, async function (msg, match) {
   const fromId = msg.from.id;
   const setRig = match[1];
   const setFan = match[2];
@@ -974,6 +1034,16 @@ bot.onText(/\/serverwatch/, async function (msg, match) {
     bot.sendMessage(
       fromId,
       `Server now watching ${rigNumbers.length} rigs, they are ${rigNumbers}`
+    );
+  }
+});
+bot.onText(/\/serveruser/, async function (msg, match) {
+  const fromId = msg.from.id;
+  if (fromId == adminId) {
+    const userId = await telegramId.distinct("id").exec();
+    bot.sendMessage(
+      fromId,
+      `On server now registered ${userId.length} users, they are ${userId}`
     );
   }
 });
