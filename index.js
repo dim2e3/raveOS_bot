@@ -50,40 +50,40 @@ async function sendRequestRigs() {
           const rigResponse = getStatus(rigs.rigNumber, rigs.rigToken).then(
             (rigResponse) => {
               saveStat(parseStatus(rigResponse));
-              // Проверка температуры видеокарт
-              if (
-                parseStatus(rigResponse).temp.reduce(
-                  (acc, rec) => acc || rec >= rigs.rigTemp,
-                  false
-                )
-              ) {
-                sendMessage(
-                  element,
-                  `<b>🔥Warning ${rigResponse.name} ${
-                    rigs.rigNumber
-                  } 🔥</b>${boldStr(
-                    parseStatus(rigResponse).temp,
-                    rigs.rigTemp
-                  )} °C`
-                );
-              }
-              // Проверка вращения вентиляторов
-              if (
-                parseStatus(rigResponse).fan_percent.reduce(
-                  (acc, rec) => acc || rec < rigs.rigFan,
-                  false
-                )
-              ) {
-                sendMessage(
-                  element,
-                  `<b>❄️Warning ${rigResponse.name} ${
-                    rigs.rigNumber
-                  } ❄️</b>${boldStr(
-                    parseStatus(rigResponse).fan_percent,
-                    rigs.rigFan
-                  )} %`
-                );
-              }
+              // // Проверка температуры видеокарт
+              // if (
+              //   parseStatus(rigResponse).temp.reduce(
+              //     (acc, rec) => acc || rec >= rigs.rigTemp,
+              //     false
+              //   )
+              // ) {
+              //   sendMessage(
+              //     element,
+              //     `<b>🔥Warning ${rigResponse.name} ${
+              //       rigs.rigNumber
+              //     } 🔥</b>${boldStr(
+              //       parseStatus(rigResponse).temp,
+              //       rigs.rigTemp
+              //     )} °C`
+              //   );
+              // }
+              // // Проверка вращения вентиляторов
+              // if (
+              //   parseStatus(rigResponse).fan_percent.reduce(
+              //     (acc, rec) => acc || rec < rigs.rigFan,
+              //     false
+              //   )
+              // ) {
+              //   sendMessage(
+              //     element,
+              //     `<b>❄️Warning ${rigResponse.name} ${
+              //       rigs.rigNumber
+              //     } ❄️</b>${boldStr(
+              //       parseStatus(rigResponse).fan_percent,
+              //       rigs.rigFan
+              //     )} %`
+              //   );
+              // }
               const rigResp =
                 rigResponse.online_status && rigResponse.mpu_list.length && 1;
               if (rigResp !== rigs.rigStatus) {
@@ -211,6 +211,7 @@ function parseStatus(serverResponse) {
     hashrate: [],
     fan_percent: [],
     fan_rpm: [],
+    name:[]
   };
   const mpu_list = serverResponse.mpu_list.forEach((videocard) => {
     rigStatus.temp = [...rigStatus.temp, videocard.temp];
@@ -218,6 +219,7 @@ function parseStatus(serverResponse) {
     rigStatus.fan_percent = [...rigStatus.fan_percent, videocard.fan_percent];
     rigStatus.fan_rpm = [...rigStatus.fan_rpm, videocard.fan_rpm];
     rigStatus.power = [...rigStatus.power, videocard.power];
+    rigStatus.name = [...rigStatus.name, videocard.name];
   });
   return rigStatus;
 }
@@ -1076,6 +1078,7 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
 <b>CPU: </b><i>${rigStatus.cpu_info}</i>
 <b>MB: </b><i>${rigStatus.mb_info}</i>
 <b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
+<b>💎Video: </b><i>${rigStatus.name}</i> <b></b>
 <b>⚡️Power W: </b><i>${rigStatus.power}</i> <b></b>
 <b>🔥Temp °C: </b><i>${boldStr(rigStatus.temp, rigs[0].rigTemp)}</i> <b></b>
 <b>❄️Fan %: </b><i>${boldStr(rigStatus.fan_percent, rigs[0].rigFan)}</i> <b></b>
@@ -1151,5 +1154,5 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
 });
 
 // Set interval request 1000 msec * 60 sec * 5 min
-const timeInterval = 1000 * 60 * 5;
+const timeInterval = 1000 * 60 * 1;
 let timerId = setInterval(() => sendRequestRigs(), timeInterval);
