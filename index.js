@@ -211,7 +211,7 @@ function parseStatus(serverResponse) {
     hashrate: [],
     fan_percent: [],
     fan_rpm: [],
-    name:[]
+    name: [],
   };
   const mpu_list = serverResponse.mpu_list.forEach((videocard) => {
     rigStatus.temp = [...rigStatus.temp, videocard.temp];
@@ -563,6 +563,8 @@ bot.onText(/\/watchstop (.+)/, async function (msg, match) {
       }
     );
     if (rigNumbers[0].rigNumbers.includes(rig)) {
+      console.log(`We are here!!!!!`, rig);
+
       const newtelegramId = telegramId
         .updateOne({ id: fromId }, { $pull: { rigNumbers: rig } })
         .exec()
@@ -1050,6 +1052,74 @@ bot.onText(/\/serveruser/, async function (msg, match) {
   }
 });
 
+bot.onText(/\/servercheck/, async function (msg, match) {
+  const fromId = msg.from.id;
+  console.log(`Server check`, fromId, adminId)
+  if (fromId == adminId) {
+    const userId = await telegramId.distinct("id").then((users)=>{
+console.log(users)
+      users.forEach((item)=>{
+        const rigNumbers = telegramId
+          .find(
+            { id: item },
+            {
+              _id: false,
+              is_bot: false,
+              id: false,
+              first_name: false,
+              last_name: false,
+              username: false,
+              rigNumber: false,
+              registerTime: false,
+            }
+          )
+          .then((data) => {
+              // console.log(`User is ${item} watching ${data[0].rigNumbers}`);
+              if (data[0].rigNumbers.length!==0){
+                // console.log(data[0].rigNumbers);
+                data[0].rigNumbers.forEach((rig) => {
+                  const res = rigState
+                    .find(
+                      { rigNumber: rig },
+                      {
+                        _id: false,
+                        id: false,
+                        rigToken: false,
+                        rigTemp: false,
+                        rigFan: false,
+                        rigCheckTime: false,
+                      }
+                    )
+                    .then((data) => {
+                      // console.log(data);
+                      if (!data[0]) {
+                        console.log(
+                          `We not found ${rig} rig in rigstate`,
+                          data,
+                          item
+                        );
+                        const newtelegramId = telegramId
+                          .updateOne(
+                            { id: item },
+                            { $pull: { rigNumbers: rig } }
+                          )
+                          .exec()
+                          .then((newStatus) =>
+                            console.log("Remove rig", item, rig)
+                          )
+                          .catch(function (err) {
+                            console.log(err);
+                          });
+                      }
+                    });
+                });
+              }
+          })
+      })
+    })
+  }
+});
+
 // Функция просмотра полного статуса риги
 bot.onText(/\/fstatus (.+)/, async function (msg, match) {
   const fromId = msg.from.id;
@@ -1066,15 +1136,16 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
       )
       .exec()
       .then((rigs) => {
-        const rigResponse = getFullStatus(
-          rigs[0].rigNumber,
-          rigs[0].rigToken
-        ).then((response) => {
-          const rigStatus = parseStatus(response);
-          const textConst = `
+        if (rigs.length !== 0) {
+          const rigResponse = getFullStatus(
+            rigs[0].rigNumber,
+            rigs[0].rigToken
+          ).then((response) => {
+            const rigStatus = parseStatus(response);
+            const textConst = `
           <b>ℹ️ID: </b><i>${rigStatus.id}</i> <b>Name: </b><i>${
-            rigStatus.name
-          }</i>
+              rigStatus.name
+            }</i>
 <b>CPU: </b><i>${rigStatus.cpu_info}</i>
 <b>MB: </b><i>${rigStatus.mb_info}</i>
 <b>⏱UpTime: </b><i>${upTime(rigStatus.boot_time)}</i>
@@ -1083,13 +1154,18 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
 <b>🔥Temp °C: </b><i>${boldStr(rigStatus.temp, rigs[0].rigTemp)}</i> <b></b>
 <b>❄️Fan %: </b><i>${boldStr(rigStatus.fan_percent, rigs[0].rigFan)}</i> <b></b>
 <b>💰Hashrate: </b><i>${rigStatus.hashrate.map(
-            (item) => Math.ceil(item / 100000) / 10
-          )}</i> <b>MH/s</b>
+              (item) => Math.ceil(item / 100000) / 10
+            )}</i> <b>MH/s</b>
           `;
-          bot.sendMessage(fromId, textConst, {
+            bot.sendMessage(fromId, textConst, {
+              parse_mode: "HTML",
+            });
+          });
+        } else {
+          bot.sendMessage(fromId, "this rig not reistered in DB", {
             parse_mode: "HTML",
           });
-        });
+        }
       });
   } else {
     const user = await telegramId.findOne({ id: fromId });
@@ -1154,5 +1230,5 @@ bot.onText(/\/fstatus (.+)/, async function (msg, match) {
 });
 
 // Set interval request 1000 msec * 60 sec * 5 min
-const timeInterval = 1000 * 60 * 1;
+const timeInterval = 1000 * 60 * 5;
 let timerId = setInterval(() => sendRequestRigs(), timeInterval);
