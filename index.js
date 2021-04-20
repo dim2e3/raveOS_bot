@@ -170,14 +170,10 @@ async function getStatus(req, request_Token = "") {
         );
         return data;
       } else {
-        // console.log("222222222222222222", "BAD Answer ", req);
-        // console.log(data);
-        // const data1 = { ...data, online_status: 2, mpu_list: [] };
-        // console.log(data1);
         return data;
       }
     } catch (error) {
-      console.error("3333333333333333333333333333333333", { error });
+      console.error("Error in GetStatus", { error });
     }
     return rigStatus && rigMpu && 1;
   }
