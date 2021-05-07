@@ -6,8 +6,7 @@
 
  - **/register** - register you *telegramID* on server to watch status rig
  - **/unregister** - delete you *telegramID* from the server
- - **/watch *num*** - add Rig to watchlist, where num is number of you Rig ex.
- - **/watch *999999***
+ - **/watch *num*** - add Rig to watchlist, where num is number of you Rig ex. **/watch *999999***
  - **/watchstop** num - remove Rig from  watchlist
  - **/watchrig** - request numbers of watching rigs
  - **/status** - request status rig from watchlist
@@ -20,4 +19,4 @@
  - **/token** - change rig token
  - **/help** - this help
 
-### for help and questions [@MyRave_bot_support](@MyRave_bot_support)
+### for help and questions *@MyRave_bot_support*

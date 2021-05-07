@@ -70,7 +70,7 @@ async function sendRequestRigs() {
               // Проверка вращения вентиляторов
               if (
                 parseStatus(rigResponse).fan_percent.reduce(
-                  (acc, rec) => acc || rec < rigs.rigFan,
+                  acc || (rec < rigFan && rec != -1),
                   false
                 )
               ) {
