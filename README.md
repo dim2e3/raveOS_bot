@@ -6,6 +6,7 @@
 
  - **/register** - register you *telegramID* on server to watch status rig
  - **/unregister** - delete you *telegramID* from the server
+ - **/menu** - show bot menu
  - **/watch *num*** - add Rig to watchlist, where num is number of you Rig ex. **/watch *999999***
  - **/watchstop** num - remove Rig from  watchlist
  - **/watchrig** - request numbers of watching rigs
